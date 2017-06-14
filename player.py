@@ -3,6 +3,8 @@ WHITE = (255, 255, 255)
 
 MOVE_SPEED = 10
 ANIMATION_SPEED = 5
+JUMP_FORCE = 9
+HANGTIME = 2
 
 displayWidth = 1000
 displayHeight = 800
@@ -16,9 +18,11 @@ class Player(pygame.sprite.Sprite):
     y = 0
 
     isJumping = False
+    onGround = True
+    jumpCounter = 0
 
     # Force and Mass
-    v = 8
+    v = JUMP_FORCE
     m = 2
 
     def loadImage(self, name):
@@ -53,38 +57,33 @@ class Player(pygame.sprite.Sprite):
 
         self.image = self.walkImages[self.index]
 
-    def setSprite(self, path):
-        self.image = pygame.image.load(path).convert_alpha()
-
-        self.image = pygame.transform.scale(self.image, (self.playerWidth, self.playerHeight))
-
-        self.rect = self.image.get_rect()
-
     def jump(self):
         self.isJumping = True
         self.image = self.jumpImages[0]
 
     def update(self):
         if self.isJumping:
-            # Calculate force
-            if self.v > 0:
-                F = (0.5 * self.m * (self.v * self.v))
-            else:
-                F = -(0.5 * self.m * (self.v * self.v))
 
-            # Change position
-            self.y = self.y - F
-            self.v = self.v - 1
+            self.jumpCounter += 1
+            if self.jumpCounter % HANGTIME == 0:
+                # Calculate force
+                if self.v > 0:
+                    F = (0.5 * self.m * (self.v * self.v))
+                else:
+                    F = -(0.5 * self.m * (self.v * self.v))
 
-            # Stop when you hit the ground
-            if self.y > self.groundY:
-                self.y = displayHeight - floorHeight - self.playerHeight
-                self.y = self.groundY
-                self.isJumping = False
-                self.image = self.walkImages[self.index]
-                self.v = 8
+                # Change position
+                self.y = self.y - F
+                self.v = self.v - 1
+
+                self.jumpCounter = 0
+
+#        if not self.onGround:
+#            self.y = self.y + 10
+
         else:
             self.animationCounter += 1
+         #   self.y = self.y + (0.5 * self.m * (JUMP_FORCE * JUMP_FORCE))
             if self.animationCounter % ANIMATION_SPEED == 0:
                 # Rotate through walking images
                 self.index += 1
@@ -95,6 +94,5 @@ class Player(pygame.sprite.Sprite):
                 self.animationCounter = 0
 
         self.rect = self.image.get_rect()
-        self.rect.x = self.x
         self.rect.y = self.y
 

@@ -3,6 +3,8 @@ import time
 import random
 from player import Player
 from background import Background
+from platform import Platform
+from asteroid import Asteroid
 
 class App:
 
@@ -11,14 +13,23 @@ class App:
     floorHeight = 200
     # This is the extra space between the players feet and the bottom of the image
     playerImageExtra = 20
-    framesPerSec = 30
+    framesPerSec = 60
+
+    score = 0
+    scoreCounter = 0
+
+    platformCounter = 0
+    platformFreq = 150
+
+    asteroidCounter = 0
+    asteroidFreq = 100
 
     def __init__(self):
         self.gameOver = False
         self.gameExit = False
 
         screenDim = (self.displayWidth, self.displayHeight)
-        gameTitle = 'Game Title'
+        gameTitle = 'Robot Runner'
 
 
         self.white = (255, 255, 255)
@@ -30,22 +41,76 @@ class App:
         pygame.init()
         self.gameDisplay = pygame.display.set_mode(screenDim)
         pygame.display.set_caption(gameTitle)
+        random.seed()
 
         self.clock = pygame.time.Clock()
 
-        font = pygame.font.SysFont(None, 25)
+        self.font = pygame.font.SysFont(None, 35)
+
+        self.platformList = []
+        self.asteroidList = []
 
         self.all_sprites_list = pygame.sprite.Group()
+        self.playerSprite = pygame.sprite.Group()
+        self.platforms = pygame.sprite.Group()
+        self.asteroids = pygame.sprite.Group()
 
         self.background = Background(self.displayWidth, self.floorHeight, self.displayHeight)
         self.player = Player(self.white, 0, self.displayHeight - self.floorHeight + self.playerImageExtra)
 
         self.all_sprites_list.add(self.background)
-        self.all_sprites_list.add(self.player)
+        #self.all_sprites_list.add(self.player)
+        self.playerSprite.add(self.player)
 
-    def message_to_screen(self, msg, color):
-        screen_text = pygame.font.render(msg, True, color)
-        self.gameDisplay.blit(screen_text, [self.displayWidth / 2, self.displayHeight / 2])
+    def messageToScreen(self, msg, color):
+        screen_text = self.font.render(msg, True, color)
+        self.gameDisplay.blit(screen_text, [self.displayWidth / 4, self.displayHeight / 2])
+
+    def showScore(self):
+        screen_text = self.font.render("Score: " + str(self.score), True, self.black)
+        self.gameDisplay.blit(screen_text, [self.displayWidth - 200, 0])
+
+    def createPlatform(self):
+        self.platformList.append(Platform(self.displayWidth + random.randrange(0, 400), random.randrange(0, 600),
+                                          random.randrange(40, 1000)))
+        self.all_sprites_list.add(self.platformList[len(self.platformList) - 1])
+        self.platforms.add(self.platformList[len(self.platformList) - 1])
+
+    def createAsteroid(self):
+        self.asteroidList.append(Asteroid(self.displayWidth + random.randrange(0, 400), random.randrange(0, 600)))
+        self.all_sprites_list.add(self.asteroidList[len(self.asteroidList) - 1])
+        self.asteroids.add(self.asteroidList[len(self.asteroidList) - 1])
+
+    def onSurface(self):
+        if self.player.isJumping:
+            if self.player.v < 0:
+                for platform in self.platforms:
+                    if pygame.sprite.collide_rect(self.player, platform):
+                        if self.player.y + self.player.playerHeight - self.playerImageExtra < platform.rect.y:
+                            self.player.y = platform.rect.y - self.player.playerHeight
+                            self.player.isJumping = False
+                            self.player.onGround = True
+                            self.player.image = self.player.walkImages[self.player.index]
+                            self.player.v = 9
+                            print ("On Platform")
+                            break
+                if self.player.y > self.displayHeight - self.floorHeight + self.playerImageExtra - self.player.playerHeight - 100:
+                    self.player.y = self.displayHeight - self.floorHeight + self.playerImageExtra - self.player.playerHeight
+                    self.player.isJumping = False
+                    self.player.image = self.player.walkImages[self.player.index]
+                    self.player.v = 9
+
+    def checkAsteroids(self):
+        for asteroid in self.asteroids:
+            if pygame.sprite.collide_rect(self.player, asteroid):
+                self.gameOver = True
+
+    def updateScore(self):
+        self.scoreCounter += 1
+        if self.scoreCounter >= 50:
+            self.score += 10
+            self.scoreCounter = 0
+
 
     def gameLoop(self):
         while not self.gameExit:
@@ -59,44 +124,57 @@ class App:
     def getEvents(self):
         if self.gameOver:
             for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_q:
-                        gameExit = True
-                        gameOver = False
-                    if event.key == pygame.K_c:
-                        self.gameLoop()
+                if event.type == pygame.QUIT:
+                    self.gameExit = True
         else:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.gameExit = True
                 if event.type == pygame.KEYDOWN:
-                  #  if event.key == pygame.K_LEFT:
-                     #   lead_x_change = -5
-                  #  elif event.key == pygame.K_RIGHT:
-                      #  lead_x_change = 5
                     if event.key == pygame.K_UP:
                         self.player.jump()
-            #    if event.type == pygame.KEYUP:
-             #       if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT or event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-             #           lead_x_change = 0
-             #           lead_y_change = 0
 
     def updateGame(self):
-        self.player.update()
-        self.background.update()
-        #        if player.rect.x >= displayWidth or player.rect.x <= 0 or lead_y >= displayHeight or lead_y <= 0:
-        #            gameOver = True
+        if not self.gameOver:
+            self.player.update()
+            self.background.update()
+            self.updateScore()
+
+            self.platformCounter += 1
+            if self.platformCounter > self.platformFreq:
+                self.createPlatform()
+                self.platformCounter = 0
+
+            self.asteroidCounter += 1
+            if self.asteroidCounter > self.asteroidFreq:
+                self.createAsteroid()
+                self.asteroidCounter = 0
+
+            self.onSurface()
+            for platform in self.platforms:
+                platform.update()
+
+            for asteroid in self.asteroids:
+                asteroid.update()
+
+            self.checkAsteroids()
 
     def updateScreen(self):
         self.gameDisplay.fill(self.white)
         if self.gameOver:
-            self.message_to_screen("Game over, press C to play again or Q to quit", self.red)
-#        else:
+            self.messageToScreen("Game over. Score: " + str(self.score), self.red)
+        else:
+            self.showScore()
 #            self.all_sprites_list.update()
 
     def drawScreen(self):
         if not self.gameOver:
+            for platform in self.platforms:
+                platform.repaint()
+
             self.all_sprites_list.draw(self.gameDisplay)
+            self.asteroids.draw(self.gameDisplay)
+            self.playerSprite.draw(self.gameDisplay)
 
         pygame.display.update()
         self.clock.tick(self.framesPerSec)
